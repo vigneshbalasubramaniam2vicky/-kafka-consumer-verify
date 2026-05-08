@@ -4,6 +4,9 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Data
 @Component
 @ConfigurationProperties(prefix = "app.kafka")
@@ -18,4 +21,5 @@ public class KafkaTopicProperties {
     private long heartbeatIntervalMs;
     private long maxPollIntervalMs;
     private int maxPollRecords;
+    private List<String> nonRetryableExceptions = new ArrayList<>();
 }

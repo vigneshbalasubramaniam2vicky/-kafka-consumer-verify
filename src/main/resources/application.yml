@@ -17,8 +17,12 @@ spring:
       auto-offset-reset: earliest
       enable-auto-commit: false
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # Read as String first; JSON mapping is done safely in listener code to avoid
+      # hard deserialization crashes for plain/base64/invalid payloads.
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
+        spring.deserializer.value.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        # Heartbeat/session tuning for local cluster resilience.
         session.timeout.ms: 30000
         heartbeat.interval.ms: 10000
         max.poll.interval.ms: 300000
@@ -26,13 +30,12 @@ spring:
         request.timeout.ms: 40000
         default.api.timeout.ms: 45000
         partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
-        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
-        spring.json.trusted.packages: com.example.consumer.dto
-        spring.json.value.default.type: com.example.consumer.dto.ConsumerMessageDto
-        spring.json.use.type.headers: false
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      # JSON serializer used by app producer and DLT publisher.
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
 
 app:
   kafka:
@@ -42,6 +45,9 @@ app:
     retry-attempts: 5
     retry-interval-ms: 1000
     max-retry-interval-ms: 10000
+    non-retryable-exceptions:
+      - java.lang.IllegalArgumentException
+      - com.fasterxml.jackson.core.JsonProcessingException
     session-timeout-ms: 30000
     heartbeat-interval-ms: 10000
     max-poll-interval-ms: 300000

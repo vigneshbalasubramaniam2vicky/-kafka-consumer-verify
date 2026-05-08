@@ -38,9 +38,9 @@ public class KafkaDltConsumer {
             log.info("DLT message persisted successfully. originalTopic={}, retryCount={}",
                     resolvedTopic, resolvedRetryCount);
         } catch (Exception ex) {
-            log.error("DLT persistence failed. originalTopic={}, retryCount={}, error={}",
-                    resolvedTopic, resolvedRetryCount, ex.getMessage(), ex);
-            throw ex;
+            // swallow so the same poison DLT message does not loop forever.
+            log.error("DLT persistence failed permanently. originalTopic={}, retryCount={}, payload={}, error={}",
+                    resolvedTopic, resolvedRetryCount, failedMessage, ex.getMessage(), ex);
         }
     }
 }
