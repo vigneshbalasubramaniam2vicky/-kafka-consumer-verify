@@ -7,12 +7,25 @@ spring:
       database: kafka-check
   kafka:
     bootstrap-servers: localhost:9092
+    listener:
+      ack-mode: record
+      concurrency: 3
+      type: single
+      missing-topics-fatal: false
     consumer:
       group-id: demo-group
       auto-offset-reset: earliest
+      enable-auto-commit: false
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
+        session.timeout.ms: 30000
+        heartbeat.interval.ms: 10000
+        max.poll.interval.ms: 300000
+        max.poll.records: 100
+        request.timeout.ms: 40000
+        default.api.timeout.ms: 45000
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: com.example.consumer.dto
         spring.json.value.default.type: com.example.consumer.dto.ConsumerMessageDto
@@ -25,8 +38,14 @@ app:
   kafka:
     topic: demo-topic
     dlt-topic: demo-topic-dlt
-    retry-attempts: 10
-    retry-interval-ms: 5000
+    dlt-group-id: demo-group-dlt
+    retry-attempts: 5
+    retry-interval-ms: 1000
+    max-retry-interval-ms: 10000
+    session-timeout-ms: 30000
+    heartbeat-interval-ms: 10000
+    max-poll-interval-ms: 300000
+    max-poll-records: 100
   mongodb:
     consumer-collection: kafka_log
     dlt-collection: kafka_dlt_log
@@ -36,5 +55,6 @@ logging:
     root: INFO
     com.example.consumer: INFO
     org.springframework.kafka: INFO
+    org.apache.kafka.clients.consumer.internals: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"

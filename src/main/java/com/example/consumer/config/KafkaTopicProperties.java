@@ -10,6 +10,12 @@ import org.springframework.stereotype.Component;
 public class KafkaTopicProperties {
     private String topic;
     private String dltTopic;
-    private long retryAttempts;
+    private String dltGroupId;
+    private int retryAttempts;
     private long retryIntervalMs;
+    private long maxRetryIntervalMs;
+    private long sessionTimeoutMs;
+    private long heartbeatIntervalMs;
+    private long maxPollIntervalMs;
+    private int maxPollRecords;
 }
