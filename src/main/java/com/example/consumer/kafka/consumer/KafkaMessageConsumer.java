@@ -17,7 +17,11 @@ public class KafkaMessageConsumer {
 
     private final ConsumerLogService consumerLogService;
 
-    @KafkaListener(topics = "${app.kafka.topic}", groupId = "${spring.kafka.consumer.group-id}")
+    @KafkaListener(
+            topics = "${app.kafka.topic}",
+            groupId = "${spring.kafka.consumer.group-id}",
+            containerFactory = "kafkaListenerContainerFactory"
+    )
     public void consume(ConsumerMessageDto message,
                         @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
                         @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,

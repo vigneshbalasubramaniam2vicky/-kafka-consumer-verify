@@ -16,7 +16,11 @@ public class KafkaDltConsumer {
 
     private final DltLogService dltLogService;
 
-    @KafkaListener(topics = "${app.kafka.dlt-topic}", groupId = "${spring.kafka.consumer.group-id}")
+    @KafkaListener(
+            topics = "${app.kafka.dlt-topic}",
+            groupId = "${app.kafka.dlt-group-id}",
+            containerFactory = "dltKafkaListenerContainerFactory"
+    )
     public void consumeDlt(@Payload String failedMessage,
                            @Header(value = KafkaHeaders.DLT_ORIGINAL_TOPIC, required = false) String originalTopic,
                            @Header(value = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) String errorMessage,
@@ -29,6 +33,14 @@ public class KafkaDltConsumer {
         log.error("Consumed DLT message. originalTopic={}, retryCount={}, error={}",
                 resolvedTopic, resolvedRetryCount, resolvedError);
 
-        dltLogService.persistFailedMessage(resolvedTopic, failedMessage, resolvedError, resolvedRetryCount);
+        try {
+            dltLogService.persistFailedMessage(resolvedTopic, failedMessage, resolvedError, resolvedRetryCount);
+            log.info("DLT message persisted successfully. originalTopic={}, retryCount={}",
+                    resolvedTopic, resolvedRetryCount);
+        } catch (Exception ex) {
+            log.error("DLT persistence failed. originalTopic={}, retryCount={}, error={}",
+                    resolvedTopic, resolvedRetryCount, ex.getMessage(), ex);
+            throw ex;
+        }
     }
 }
