@@ -15,8 +15,8 @@ import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
+import org.springframework.kafka.support.serializer.DeserializationException;
 import org.springframework.util.backoff.FixedBackOff;
-
 
 @Slf4j
 @Configuration
@@ -26,11 +26,6 @@ public class KafkaConsumerConfig {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final KafkaTopicProperties kafkaTopicProperties;
 
-    /**
-     * Main topic error handler:
-     * - Retries message processing with exponential backoff.
-     * - After retries are exhausted, publishes to DLT.
-     */
     @Bean
     public DefaultErrorHandler kafkaErrorHandler() {
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
@@ -42,14 +37,16 @@ public class KafkaConsumerConfig {
                 }
         );
 
-        ExponentialBackOffWithMaxRetries backOff = new ExponentialBackOffWithMaxRetries((int) kafkaTopicProperties.getRetryAttempts());
+        ExponentialBackOffWithMaxRetries backOff =
+                new ExponentialBackOffWithMaxRetries(kafkaTopicProperties.getRetryAttempts());
         backOff.setInitialInterval(kafkaTopicProperties.getRetryIntervalMs());
         backOff.setMultiplier(2.0);
         backOff.setMaxInterval(kafkaTopicProperties.getMaxRetryIntervalMs());
 
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, backOff);
 
-        errorHandler.addNotRetryableExceptions(IllegalArgumentException.class);
+        // Deserialization and validation errors should go directly to DLT.
+        errorHandler.addNotRetryableExceptions(DeserializationException.class, IllegalArgumentException.class);
 
         errorHandler.setRetryListeners((ConsumerRecord<?, ?> record, Exception ex, int deliveryAttempt) ->
                 log.warn("Retry attempt {} for topic={}, partition={}, offset={}, cause={}",
@@ -58,13 +55,9 @@ public class KafkaConsumerConfig {
         return errorHandler;
     }
 
-    /**
-     * DLT error handler:
-     * - No retries.
-     * - No re-publish to DLT (prevents infinite loop).
-     */
     @Bean
     public CommonErrorHandler dltErrorHandler() {
+        // Never republish from DLT listener to avoid recursion.
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(new FixedBackOff(0L, 0L));
         errorHandler.setRetryListeners((record, ex, attempt) ->
                 log.error("DLT processing failed with no retry. topic={}, partition={}, offset={}, error={}",
@@ -78,13 +71,10 @@ public class KafkaConsumerConfig {
             ConsumerFactory<Object, Object> consumerFactory,
             DefaultErrorHandler kafkaErrorHandler) {
 
-        ConcurrentKafkaListenerContainerFactory<Object, Object> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
+        ConcurrentKafkaListenerContainerFactory<Object, Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
         configurer.configure(factory, consumerFactory);
-
         factory.setCommonErrorHandler(kafkaErrorHandler);
         factory.getContainerProperties().setObservationEnabled(true);
-
         return factory;
     }
 
@@ -94,15 +84,11 @@ public class KafkaConsumerConfig {
             ConsumerFactory<Object, Object> consumerFactory,
             CommonErrorHandler dltErrorHandler) {
 
-        ConcurrentKafkaListenerContainerFactory<Object, Object> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
+        ConcurrentKafkaListenerContainerFactory<Object, Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
         configurer.configure(factory, consumerFactory);
-
         factory.setCommonErrorHandler(dltErrorHandler);
         factory.setConcurrency(1);
         factory.getContainerProperties().setObservationEnabled(true);
-
         return factory;
     }
-
 }
